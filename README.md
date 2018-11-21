@@ -1,37 +1,62 @@
-# es2015-library-skeleton
+# graphql-multiplex-subscriptions
 
-[![Build Status](https://travis-ci.org/jedwards1211/es2015-library-skeleton.svg?branch=master)](https://travis-ci.org/jedwards1211/es2015-library-skeleton)
-[![Coverage Status](https://codecov.io/gh/jedwards1211/es2015-library-skeleton/branch/master/graph/badge.svg)](https://codecov.io/gh/jedwards1211/es2015-library-skeleton)
+[![Build Status](https://travis-ci.org/jcoreio/graphql-multiplex-subscriptions.svg?branch=master)](https://travis-ci.org/jcoreio/graphql-multiplex-subscriptions)
+[![Coverage Status](https://codecov.io/gh/jcoreio/graphql-multiplex-subscriptions/branch/master/graph/badge.svg)](https://codecov.io/gh/jcoreio/graphql-multiplex-subscriptions)
 [![semantic-release](https://img.shields.io/badge/%20%20%F0%9F%93%A6%F0%9F%9A%80-semantic--release-e10079.svg)](https://github.com/semantic-release/semantic-release)
 [![Commitizen friendly](https://img.shields.io/badge/commitizen-friendly-brightgreen.svg)](http://commitizen.github.io/cz-cli/)
-[![npm version](https://badge.fury.io/js/es2015-library-skeleton.svg)](https://badge.fury.io/js/es2015-library-skeleton)
+[![npm version](https://badge.fury.io/js/graphql-multiplex-subscriptions.svg)](https://badge.fury.io/js/graphql-multiplex-subscriptions)
 
-This is my personal skeleton for creating an ES2015 library npm package.  You are welcome to use it.
+If you need to use multiple `PubSubEngines` in your Apollo server (e.g.
+`graphql-redis-subscriptions` and `graphql-postgres-subscriptions`), use this
+package to coordinate which `PubSubEngine` handles a given topic.
 
-## Quick start
+# Usage
 
-```sh
-npm i -g howardroark/pollinate
-pollinate https://github.com/jedwards1211/es2015-library-skeleton.git --keep-history --name <package name> --author <your name> --organization <github organization> --description <package description>
-cd <package name>
-npm i
+Imagine you're currently using `graphql-redis-subscriptions`, and you set up
+your `pubsub` like this:
+
+```js
+// Before
+import { RedisPubSub } from 'graphql-redis-subscriptions'
+
+export const pubsub = new RedisPubSub()
 ```
 
-## Tools used
+But then you decide you want to use `graphql-postgres-subscriptions` for some
+topics. All you have to do is create a `MultiplexPubSub` with a `selectEngine`
+function that returns which engine you'd like to use for a given topic. For
+example, you could use postgres for all topics beginning with `pg/`:
 
-* babel 6
-* babel-preset-env
-* mocha
-* chai
-* istanbul
-* nyc
-* babel-plugin-istanbul
-* eslint
-* eslint-watch
-* flow
-* flow-watch
-* pre-commit (runs eslnt and flow)
-* semantic-release
-* Travis CI
-* Coveralls
+```js
+import { RedisPubSub } from 'graphql-redis-subscriptions'
+import { PostgresPubSub } from 'graphql-postgres-subscriptions'
+import { MultiplexPubSub } from 'graphql-multiplex-subscriptions'
 
+const redisPubSub = new RedisPubSub()
+const postgresPubSub = new PostgresPubSub()
+
+export const pubsub = new MultiplexPubSub({
+  selectEngine: topic =>
+    topic.startsWith('pg/') ? postgresPubSub : redisPubSub,
+})
+```
+
+**WARNING**: `selectEngine` should always return a `PubSubEngine`. If it doesn't,
+you will get `TypeError`s!
+
+Since you use a function to select the engine you can use whatever logic you
+want. So you could just map specific topics to a specific engine:
+
+```js
+import { RedisPubSub } from 'graphql-redis-subscriptions'
+import { PostgresPubSub } from 'graphql-postgres-subscriptions'
+import { MultiplexPubSub } from 'graphql-multiplex-subscriptions'
+
+const redisPubSub = new RedisPubSub()
+const postgresPubSub = new PostgresPubSub()
+
+export const pubsub = new MultiplexPubSub({
+  selectEngine: topic =>
+    topic.matches(/^(user|organization)\//) ? postgresPubSub : redisPubSub,
+})
+```
